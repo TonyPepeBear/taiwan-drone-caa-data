@@ -1,0 +1,37 @@
+[
+  {
+    "slug": "uav_restricted_airspace",
+    "title": "主空域 / 禁限航區",
+    "service": "Hosted/UAV_fs/FeatureServer/3",
+    "page_size": 1000,
+    "enabled": true
+  },
+  {
+    "slug": "temporary_area",
+    "title": "臨時空域",
+    "service": "Hosted/Temporary_Area/FeatureServer/19",
+    "page_size": 1000,
+    "enabled": true
+  },
+  {
+    "slug": "national_park",
+    "title": "國家公園",
+    "service": "Hosted/National_Park_fs/FeatureServer/0",
+    "page_size": 1000,
+    "enabled": true
+  },
+  {
+    "slug": "commercial_port",
+    "title": "商港區",
+    "service": "Hosted/Commercial_Port_fs/FeatureServer/4",
+    "page_size": 1000,
+    "enabled": true
+  },
+  {
+    "slug": "county",
+    "title": "行政區",
+    "service": "Hosted/County_fs/FeatureServer/0",
+    "page_size": 1000,
+    "enabled": true
+  }
+]
