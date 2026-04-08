@@ -337,7 +337,23 @@ def main() -> int:
                 print("no changes detected")
         else:
             print(f"previous manifest not found: {prev_path}")
-            diff = {"has_changes": True, "reason": "no_previous_release"}
+            layers_diff = {}
+            for layer in manifest_layers:
+                layers_diff[layer["slug"]] = {
+                    "previous_count": 0,
+                    "current_count": layer["feature_count"],
+                    "added_objectids": layer.get("objectids", []),
+                    "removed_objectids": [],
+                    "changed": True,
+                    "is_new": True,
+                }
+            diff = {
+                "has_changes": True,
+                "reason": "no_previous_release",
+                "changed_layer_count": len(layers_diff),
+                "total_layer_count": len(layers_diff),
+                "layers": layers_diff,
+            }
             write_json(output_dir / "diff_report.json", diff)
             generate_changelog(diff, manifest, output_dir)
             print("no previous release found, treating as initial release")

@@ -43,14 +43,19 @@ all-layers.zip                        # 全部圖層打包（含未壓縮 GeoJSO
 
 ### 快速下載最新版
 
+以下連結指向最新 Release 的附件，點擊即可下載：
+
+- [all-layers.zip](https://github.com/TonyPepeBear/taiwan-drone-caa-data/releases/latest/download/all-layers.zip) — 全部圖層打包
+- [uav_restricted_airspace.geojson.gz](https://github.com/TonyPepeBear/taiwan-drone-caa-data/releases/latest/download/uav_restricted_airspace.geojson.gz) — 主空域 / 禁限航區
+- [temporary_area.geojson.gz](https://github.com/TonyPepeBear/taiwan-drone-caa-data/releases/latest/download/temporary_area.geojson.gz) — 臨時空域
+- [national_park.geojson.gz](https://github.com/TonyPepeBear/taiwan-drone-caa-data/releases/latest/download/national_park.geojson.gz) — 國家公園
+- [commercial_port.geojson.gz](https://github.com/TonyPepeBear/taiwan-drone-caa-data/releases/latest/download/commercial_port.geojson.gz) — 商港區
+- [county.geojson.gz](https://github.com/TonyPepeBear/taiwan-drone-caa-data/releases/latest/download/county.geojson.gz) — 行政區
+- [manifest.json](https://github.com/TonyPepeBear/taiwan-drone-caa-data/releases/latest/download/manifest.json) — 總表
+
+解壓 `.geojson.gz`：
+
 ```bash
-# 下載最新 release 的全部打包檔
-gh release download --pattern "all-layers.zip" --clobber
-
-# 或只下載特定圖層
-gh release download --pattern "uav_restricted_airspace.geojson.gz" --clobber
-
-# 解壓
 gunzip uav_restricted_airspace.geojson.gz
 ```
 
