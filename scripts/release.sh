@@ -76,7 +76,7 @@ print(now.strftime('%Y-%m-%d %H:%M'))
 ")
 
 echo "Tag: $TAG"
-echo "Title: 空域資料同步 $DISPLAY_DATE"
+echo "Title: 台灣空拍機空域資料 $DISPLAY_DATE"
 
 CHANGELOG_FILE="$SYNC_OUTPUT/changelog.md"
 if [ ! -f "$CHANGELOG_FILE" ]; then
@@ -108,7 +108,7 @@ done
 
 gh release create "$TAG" \
     "${ASSETS[@]}" \
-    --title "空域資料同步 $DISPLAY_DATE" \
+    --title "台灣空拍機空域資料 $DISPLAY_DATE" \
     --notes-file "$CHANGELOG_FILE"
 
 echo "=== Release $TAG created successfully ==="
