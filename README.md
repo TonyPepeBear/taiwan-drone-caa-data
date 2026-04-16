@@ -22,7 +22,7 @@
 
 ## 如何下載資料
 
-所有資料都放在 [GitHub Releases](../../releases)，每次同步有變動時自動發布。
+所有資料都放在 [GitHub Releases](../../releases)，每日自動同步比對，資料有變動時自動發布新版本。
 
 每個 Release 包含以下檔案：
 
