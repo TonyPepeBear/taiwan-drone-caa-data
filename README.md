@@ -1,6 +1,6 @@
 # taiwan-drone-caa-data
 
-台灣民航局（CAA）無人機空域圖資的開源資料倉庫，自動從民航局 GIS 平台同步並透過 [GitHub Releases](../../releases) 發布歷史版本。
+台灣民航局（CAA）無人機空域圖資的開源資料倉庫，每日自動更新，從民航局 GIS 平台同步並透過 [GitHub Releases](../../releases) 發布歷史版本。
 
 ## 資料來源
 
