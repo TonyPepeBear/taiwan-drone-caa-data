@@ -9,10 +9,6 @@ PREV_DIR="/tmp/previous-release"
 rm -rf "$SYNC_OUTPUT" "$PREV_DIR"
 mkdir -p "$SYNC_OUTPUT" "$PREV_DIR"
 
-echo "=== Syncing layers ==="
-python3 "$REPO_ROOT/scripts/sync_arcgis.py" \
-    --output-dir "$SYNC_OUTPUT"
-
 PREV_MANIFEST=""
 LATEST_TAG=""
 
@@ -29,18 +25,18 @@ if LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/
     if [ -f "$PREV_DIR/manifest.json" ]; then
         PREV_MANIFEST="$PREV_DIR/manifest.json"
         echo "Previous manifest found, running comparison..."
-        python3 "$REPO_ROOT/scripts/sync_arcgis.py" \
+        bash "$REPO_ROOT/scripts/run_sync.sh" \
             --output-dir "$SYNC_OUTPUT" \
             --compare-manifest "$PREV_MANIFEST"
     else
         echo "Previous manifest not found in release, creating initial release..."
-        python3 "$REPO_ROOT/scripts/sync_arcgis.py" \
+        bash "$REPO_ROOT/scripts/run_sync.sh" \
             --output-dir "$SYNC_OUTPUT" \
             --compare-manifest "/nonexistent"
     fi
 else
     echo "No existing releases, creating initial release..."
-    python3 "$REPO_ROOT/scripts/sync_arcgis.py" \
+    bash "$REPO_ROOT/scripts/run_sync.sh" \
         --output-dir "$SYNC_OUTPUT" \
         --compare-manifest "/nonexistent"
 fi
