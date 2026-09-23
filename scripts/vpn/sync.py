@@ -15,7 +15,7 @@ def main():
     if not config.strip() or "<insert_" in config:
         raise SystemExit("Missing valid WireGuard configuration")
     # Docker's bridge isolates all interface and route changes from the host.
-    os.umask(0o077)
+    previous_umask = os.umask(0o077)
     path = Path("/run/wireguard.conf")
     path.write_text(config)
     del config
@@ -24,6 +24,7 @@ def main():
         run("wg", "setconf", "wg-caa", str(path))
     finally:
         path.unlink(missing_ok=True)
+        os.umask(previous_umask)
     run("ip", "address", "add", "10.14.0.2/32", "dev", "wg-caa")
     run("ip", "link", "set", "wg-caa", "mtu", "1380", "up")
     host = "dronegis.caa.gov.tw"

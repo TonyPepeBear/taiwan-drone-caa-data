@@ -21,11 +21,13 @@ class VPNSyncTests(unittest.TestCase):
 
     def exercise(self, handshake="peer\t123\n", failure=None):
         config = "[Interface]\nPrivateKey = test-only\n"
-        with patch.object(vpn.sys, "stdin", io.StringIO(config)), patch.object(vpn.sys, "argv", ["sync.py", "--layer", "county"]), patch.object(vpn.os, "umask"), patch.object(vpn.Path, "write_text"), patch.object(vpn.Path, "unlink") as unlink, patch.object(vpn.socket, "getaddrinfo", return_value=[(2, 1, 6, "", ("192.0.2.1", 443))]), patch("builtins.open", mock_open()) as hosts, patch.object(vpn, "run", side_effect=failure) as run, patch.object(vpn.subprocess, "check_output", return_value=handshake):
+        with patch.object(vpn.sys, "stdin", io.StringIO(config)), patch.object(vpn.sys, "argv", ["sync.py", "--layer", "county"]), patch.object(vpn.os, "umask", return_value=0o022) as umask, patch.object(vpn.Path, "write_text"), patch.object(vpn.Path, "unlink") as unlink, patch.object(vpn.socket, "getaddrinfo", return_value=[(2, 1, 6, "", ("192.0.2.1", 443))]), patch("builtins.open", mock_open()) as hosts, patch.object(vpn, "run", side_effect=failure) as run, patch.object(vpn.subprocess, "check_output", return_value=handshake):
             try:
                 vpn.main()
             finally:
                 unlink.assert_called_once_with(missing_ok=True)
+                self.assertEqual(umask.call_args_list[0].args, (0o077,))
+                self.assertEqual(umask.call_args_list[-1].args, (0o022,))
             return run, hosts
 
     def test_routes_only_caa_and_forwards_arguments(self):
