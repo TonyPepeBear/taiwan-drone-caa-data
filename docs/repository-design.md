@@ -98,7 +98,7 @@ Git repo **不追蹤**任何資料檔案（GeoJSON、壓縮檔、metadata），�
 CI 環境中執行的發布腳本：
 
 1. 執行 `sync_arcgis.py` 同步資料
-2. 下載最新 release 的 `manifest.json`
+2. 下載最新 release 的 `manifest.json` 和 `*.geojson.gz`
 3. 比對新舊 manifest（objectid 集合與圖徵內容指紋）
 4. 無變動 → 結束
 5. 有變動 → 產生 changelog、打包 `all-layers.zip`、建立 release
@@ -109,7 +109,8 @@ CI 環境中執行的發布腳本：
 - 以 SHA-256 比對完整圖徵（含屬性和幾何），忽略 feature 順序與 JSON 物件鍵順序，但保留陣列順序
 - 偵測新增 / 移除的 feature，以及同一組 ID 的內容異動
 - 舊版 manifest 缺少內容指紋時發布一次建立基準，不宣稱已證實內容異動
-- 產生人類可讀的 changelog
+- 比較圖徵快照，按圖層列出新增、移除、更新的名稱與 ID，改名顯示前後名稱
+- 完整 changelog 一律作為附件；過長時正文只列摘要
 
 ## GitHub Actions
 

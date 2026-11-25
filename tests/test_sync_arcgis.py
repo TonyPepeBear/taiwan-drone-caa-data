@@ -34,7 +34,7 @@ class SyncComparisonTests(unittest.TestCase):
         ):
             self.assertEqual(sync_arcgis.main(), 0)
 
-    def compare(self, before, after, *, legacy=False):
+    def compare(self, before, after, *, legacy=False, compressed=False):
         with tempfile.TemporaryDirectory() as temp:
             before_dir, after_dir = Path(temp) / "before", Path(temp) / "after"
             self.run_sync(before_dir, before)
@@ -43,6 +43,8 @@ class SyncComparisonTests(unittest.TestCase):
                 data = json.loads(manifest.read_text())
                 data["layers"][0].pop("features_sha256")
                 manifest.write_text(json.dumps(data))
+            if compressed:
+                (before_dir / f"{LAYER['slug']}.geojson").unlink()
             self.run_sync(after_dir, after, manifest)
             diff = json.loads((after_dir / "diff_report.json").read_text())
             path = after_dir / "changelog.md"
@@ -81,6 +83,33 @@ class SyncComparisonTests(unittest.TestCase):
         self.assertTrue(diff["has_changes"])
         self.assertEqual(layer["added_objectids"], [43])
         self.assertEqual(layer["removed_objectids"], [42])
+
+    def test_lists_all_names_from_both_snapshots_with_ids(self):
+        def named(oid, name):
+            return {**FEATURE, "id": oid, "properties": {"空域名稱": name}}
+
+        before = [named(8, "舊名稱"), named(15, "移除區"), named(2, "保留區")]
+        after = [named(8, "新名稱"), named(16, "同名區"), named(17, "同名區"), named(2, "保留區")]
+        _, notes = self.compare(before, after, compressed=True)
+        for entry in (
+            "舊名稱 → 新名稱（objectid: 8）", "移除區（objectid: 15）",
+            "同名區（objectid: 16）", "同名區（objectid: 17）",
+        ):
+            self.assertIn(entry, notes)
+        self.assertNotIn("保留區", notes)
+
+    def test_reads_names_from_all_layer_schemas(self):
+        for slug, field in (
+            ("uav_restricted_airspace", "空域名稱"), ("temporary_area", "空域名稱"),
+            ("national_park", "name_full"), ("commercial_port", "名稱"),
+            ("commercial_port", "name"), ("county", "countyname"),
+        ):
+            with self.subTest(slug=slug, field=field):
+                self.assertEqual(sync_arcgis.feature_name(slug, {"properties": {field: "樣本"}}), "樣本")
+
+    def test_source_names_are_escaped_for_markdown(self):
+        value = sync_arcgis.markdown_name("<b>@name</b> [a]")
+        self.assertEqual(value, r"&lt;b&gt;&#64;name&lt;/b&gt; \[a\]")
 
     def test_legacy_manifest_creates_baseline_without_claiming_change(self):
         diff, changelog = self.compare([FEATURE], [FEATURE], legacy=True)

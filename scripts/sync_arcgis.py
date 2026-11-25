@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import html
 import json
+import re
 import ssl
 import sys
 import time
@@ -46,6 +48,8 @@ def parse_args() -> argparse.Namespace:
         "--compare-manifest",
         help="Path to a previous manifest.json for diff comparison",
     )
+    parser.add_argument("--require-previous-geojson", action="store_true",
+                        help="Fail if an existing changed layer is missing its previous GeoJSON")
     return parser.parse_args()
 
 
@@ -123,13 +127,14 @@ def collect_objectids(geojson: dict[str, Any]) -> set[int]:
     return ids
 
 
+def canonical_feature(feature: dict[str, Any]) -> str:
+    return json.dumps(feature, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
 def fingerprint_features(features: list[dict[str, Any]]) -> str:
     # Feature order and JSON object key order do not change the published data.
     # Preserve order within arrays, notably the geometry's coordinates.
-    canonical = sorted(
-        json.dumps(feature, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        for feature in features
-    )
+    canonical = sorted(map(canonical_feature, features))
     digest = hashlib.sha256()
     for feature in canonical:
         digest.update(feature.encode("utf-8"))
@@ -258,10 +263,100 @@ def compare_manifests(
     }
 
 
+NAME_FIELDS = {
+    "uav_restricted_airspace": ("空域名稱",),
+    "temporary_area": ("空域名稱",),
+    "national_park": ("name_full",),
+    "commercial_port": ("名稱", "name"),
+    "county": ("countyname",),
+}
+
+
+def feature_name(slug: str, feature: dict[str, Any]) -> str:
+    properties = feature.get("properties") or {}
+    for key in (*NAME_FIELDS.get(slug, ()), "空域名稱", "名稱", "name"):
+        value = properties.get(key)
+        if isinstance(value, str) and value.strip():
+            return " ".join(value.split())
+    return "未命名"
+
+
+def markdown_name(name: str) -> str:
+    escaped = html.escape(name, quote=False).replace("@", "&#64;")
+    return re.sub(r"([\\*_\x60{}\[\]()~])", r"\\\1", escaped)
+
+
+def read_snapshot(directory: Path, slug: str) -> dict[int, dict[str, Any]] | None:
+    plain = directory / f"{slug}.geojson"
+    compressed = directory / f"{slug}.geojson.gz"
+    if plain.is_file():
+        payload = json.loads(plain.read_text(encoding="utf-8"))
+    elif compressed.is_file():
+        with gzip.open(compressed, "rt", encoding="utf-8") as stream:
+            payload = json.load(stream)
+    else:
+        return None
+
+    features = {}
+    for feature in payload["features"]:
+        oid = int(feature["id"])
+        if oid in features:
+            raise ValueError(f"Duplicate objectid {oid} in {slug}")
+        features[oid] = feature
+    return features
+
+
+def append_feature_changes(
+    lines: list[str],
+    slug: str,
+    info: dict[str, Any],
+    output_dir: Path,
+    previous_dir: Path | None,
+    require_previous: bool,
+) -> None:
+    current = read_snapshot(output_dir, slug) or {}
+    previous = (
+        read_snapshot(previous_dir, slug)
+        if previous_dir is not None and not info.get("is_new")
+        else None
+    )
+    if previous is None and not info.get("is_new"):
+        if require_previous:
+            raise RuntimeError(f"Missing previous GeoJSON for {slug}")
+        lines.extend(["- 缺少前版 GeoJSON，無法核對移除名稱或逐筆更新。", ""])
+
+    old = previous or {}
+    updated = [
+        oid for oid in sorted(old.keys() & current.keys())
+        if canonical_feature(old[oid]) != canonical_feature(current[oid])
+    ]
+    sections = (
+        ("新增", info["added_objectids"], current),
+        ("移除", info["removed_objectids"], old),
+        ("更新", updated, current),
+    )
+    for label, ids, features in sections:
+        if not ids:
+            continue
+        lines.append(f"#### {label}（{len(ids)} 筆）")
+        for oid in ids:
+            name = feature_name(slug, features[oid]) if oid in features else "名稱無法取得"
+            display = markdown_name(name)
+            if label == "更新":
+                old_name = feature_name(slug, old[oid])
+                if old_name != name:
+                    display = f"{markdown_name(old_name)} → {display}"
+            lines.append(f"- {display}（objectid: {oid}）")
+        lines.append("")
+
+
 def generate_changelog(
     diff: dict[str, Any],
     current_manifest: dict[str, Any],
     output_dir: Path,
+    previous_dir: Path | None = None,
+    *,
+    require_previous: bool = False,
 ) -> Path:
     title_map: dict[str, str] = {}
     for layer in current_manifest.get("layers", []):
@@ -289,12 +384,6 @@ def generate_changelog(
             delta = cur - prev
             sign = "+" if delta > 0 else ""
             lines.append(f"- 筆數：{prev} → {cur}（{sign}{delta}）")
-            if info["added_objectids"]:
-                ids_str = ", ".join(str(i) for i in info["added_objectids"])
-                lines.append(f"- 新增 objectid：{ids_str}")
-            if info["removed_objectids"]:
-                ids_str = ", ".join(str(i) for i in info["removed_objectids"])
-                lines.append(f"- 移除 objectid：{ids_str}")
             if info.get("content_baseline_missing"):
                 lines.append("- 前版未記錄內容指紋，本版建立後續比對基準")
             elif info.get("content_changed") and not (
@@ -302,6 +391,7 @@ def generate_changelog(
             ):
                 lines.append("- objectid 不變，但圖徵屬性或幾何內容有更新")
         lines.append("")
+        append_feature_changes(lines, slug, info, output_dir, previous_dir, require_previous)
 
     if unchanged_layers:
         lines.append("### 無變動圖層")
@@ -357,7 +447,10 @@ def main() -> int:
             write_json(output_dir / "diff_report.json", diff)
 
             if diff["has_changes"]:
-                generate_changelog(diff, manifest, output_dir)
+                generate_changelog(
+                    diff, manifest, output_dir, prev_path.resolve().parent,
+                    require_previous=args.require_previous_geojson,
+                )
                 print(
                     f"changes detected: {diff['changed_layer_count']} layer(s) changed"
                 )

@@ -38,6 +38,7 @@ national_park.metadata.json
 commercial_port.metadata.json
 county.metadata.json
 manifest.json                         # 總表（含所有圖層資訊）
+changelog.md                         # 完整變動名稱與 ID
 all-layers.zip                        # 全部圖層打包（含未壓縮 GeoJSON）
 ```
 
@@ -77,7 +78,7 @@ gunzip uav_restricted_airspace.geojson.gz
 
 - **Tag 格式**：`vYYYY.MM.DD-HHMM`（UTC+8 時間）
 - **自動偵測變動**：比對前後兩版的 objectid 集合與圖徵內容（含屬性和幾何）；前版未記錄內容指紋時會發布一次以建立基準
-- **Release body**：列出每個圖層的筆數變化、新增 / 移除的 objectid，以及 ID 不變的內容更新
+- **Release body**：按圖層逐一列出新增、移除、更新的圖徵名稱與 objectid；改名顯示前後名稱。大量變動時，正文保留摘要，完整名單見 `changelog.md` 附件
 - **保留策略**：所有 release 全部保留，可回溯任意時間點的資料快照
 
 ## 自動同步
@@ -99,7 +100,7 @@ python3 scripts/sync_arcgis.py --output-dir ./data/latest
 # 只同步單一圖層
 python3 scripts/sync_arcgis.py --layer uav_restricted_airspace --output-dir ./data/latest
 
-# 同步並與前一版比對
+# 同步並與前一版比對（將前版 GeoJSON 或 .geojson.gz 放在 manifest 同目錄以列出名稱）
 python3 scripts/sync_arcgis.py --output-dir ./data/latest --compare-manifest path/to/manifest.json
 ```
 

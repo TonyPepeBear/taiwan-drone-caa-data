@@ -13,26 +13,26 @@ PREV_MANIFEST=""
 LATEST_TAG=""
 
 echo "=== Checking for existing releases ==="
-if LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null) && [ -n "$LATEST_TAG" ]; then
+LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""')
+if [ -n "$LATEST_TAG" ]; then
     echo "Latest release: $LATEST_TAG"
-    echo "Downloading previous manifest..."
+    echo "Downloading previous manifest and GeoJSON..."
     gh release download "$LATEST_TAG" \
         --pattern "manifest.json" \
+        --pattern "*.geojson.gz" \
         --dir "$PREV_DIR" \
-        --clobber \
-        2>/dev/null || true
+        --clobber
 
     if [ -f "$PREV_DIR/manifest.json" ]; then
         PREV_MANIFEST="$PREV_DIR/manifest.json"
         echo "Previous manifest found, running comparison..."
         bash "$REPO_ROOT/scripts/run_sync.sh" \
             --output-dir "$SYNC_OUTPUT" \
-            --compare-manifest "$PREV_MANIFEST"
+            --compare-manifest "$PREV_MANIFEST" \
+            --require-previous-geojson
     else
-        echo "Previous manifest not found in release, creating initial release..."
-        bash "$REPO_ROOT/scripts/run_sync.sh" \
-            --output-dir "$SYNC_OUTPUT" \
-            --compare-manifest "/nonexistent"
+        echo "Previous manifest missing from release $LATEST_TAG" >&2
+        exit 1
     fi
 else
     echo "No existing releases, creating initial release..."
@@ -96,15 +96,29 @@ zip -j "$SYNC_OUTPUT/all-layers.zip" ./*.geojson ./*.metadata.json ./manifest.js
 cd "$REPO_ROOT"
 rm -rf "$ZIP_DIR"
 
+NOTES_FILE="$CHANGELOG_FILE"
+# Large change lists are still available in the complete attachment.
+if [ "$(wc -c < "$CHANGELOG_FILE")" -gt 60000 ]; then
+    NOTES_FILE="$SYNC_OUTPUT/release-notes.md"
+    {
+        echo "## 變動摘要"
+        echo
+        grep -E '^### |^本次同步共 ' "$CHANGELOG_FILE"
+        echo
+        echo '完整新增、移除與更新名稱請見下方附件 `changelog.md`。'
+    } > "$NOTES_FILE"
+fi
+
 echo "=== Creating release ==="
 ASSETS=()
 for f in "$SYNC_OUTPUT"/*.geojson.gz "$SYNC_OUTPUT"/*.metadata.json "$SYNC_OUTPUT"/manifest.json "$SYNC_OUTPUT"/all-layers.zip; do
     ASSETS+=("$f")
 done
+ASSETS+=("$CHANGELOG_FILE")
 
 gh release create "$TAG" \
     "${ASSETS[@]}" \
     --title "台灣空拍機空域資料 $DISPLAY_DATE" \
-    --notes-file "$CHANGELOG_FILE"
+    --notes-file "$NOTES_FILE"
 
 echo "=== Release $TAG created successfully ==="
