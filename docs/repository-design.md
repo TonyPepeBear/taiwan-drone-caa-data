@@ -65,6 +65,7 @@ Git repo **不追蹤**任何資料檔案（GeoJSON、壓縮檔、metadata），�
       "feature_count": 4744,
       "reported_count": 4744,
       "objectids": [1, 2, ...],
+      "features_sha256": "...",
       "page_size": 1000,
       "page_count": 5,
       "fetched_at": "..."
@@ -98,14 +99,16 @@ CI 環境中執行的發布腳本：
 
 1. 執行 `sync_arcgis.py` 同步資料
 2. 下載最新 release 的 `manifest.json`
-3. 比對新舊 manifest（objectid 集合差異）
+3. 比對新舊 manifest（objectid 集合與圖徵內容指紋）
 4. 無變動 → 結束
 5. 有變動 → 產生 changelog、打包 `all-layers.zip`、建立 release
 
 ### 差異比對邏輯
 
 - 比較每個圖層的 objectid 集合
-- 偵測新增 / 移除的 feature
+- 以 SHA-256 比對完整圖徵（含屬性和幾何），忽略 feature 順序與 JSON 物件鍵順序，但保留陣列順序
+- 偵測新增 / 移除的 feature，以及同一組 ID 的內容異動
+- 舊版 manifest 缺少內容指紋時發布一次建立基準，不宣稱已證實內容異動
 - 產生人類可讀的 changelog
 
 ## GitHub Actions

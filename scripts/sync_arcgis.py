@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 import ssl
 import sys
@@ -122,6 +123,20 @@ def collect_objectids(geojson: dict[str, Any]) -> set[int]:
     return ids
 
 
+def fingerprint_features(features: list[dict[str, Any]]) -> str:
+    # Feature order and JSON object key order do not change the published data.
+    # Preserve order within arrays, notably the geometry's coordinates.
+    canonical = sorted(
+        json.dumps(feature, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        for feature in features
+    )
+    digest = hashlib.sha256()
+    for feature in canonical:
+        digest.update(feature.encode("utf-8"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
 def sync_layer(
     layer: dict[str, Any],
     output_dir: Path,
@@ -163,6 +178,7 @@ def sync_layer(
         "feature_count": len(features),
         "reported_count": count,
         "objectids": sorted(objectids),
+        "features_sha256": fingerprint_features(features),
         "page_size": page_size,
         "page_count": page_count,
         "fetched_at": fetched_at,
@@ -214,13 +230,19 @@ def compare_manifests(
         prev_ids = set(prev.get("objectids", []))
         added = sorted(cur_ids - prev_ids)
         removed = sorted(prev_ids - cur_ids)
-        changed = bool(added or removed)
+        cur_digest = cur.get("features_sha256")
+        prev_digest = prev.get("features_sha256")
+        baseline_missing = bool(cur_digest and not prev_digest)
+        content_changed = bool(cur_digest and prev_digest and cur_digest != prev_digest)
+        changed = bool(added or removed or baseline_missing or content_changed)
 
         layers_diff[slug] = {
             "previous_count": prev["feature_count"],
             "current_count": cur["feature_count"],
             "added_objectids": added,
             "removed_objectids": removed,
+            "content_changed": content_changed,
+            "content_baseline_missing": baseline_missing,
             "changed": changed,
             "is_new": False,
         }
@@ -273,6 +295,12 @@ def generate_changelog(
             if info["removed_objectids"]:
                 ids_str = ", ".join(str(i) for i in info["removed_objectids"])
                 lines.append(f"- 移除 objectid：{ids_str}")
+            if info.get("content_baseline_missing"):
+                lines.append("- 前版未記錄內容指紋，本版建立後續比對基準")
+            elif info.get("content_changed") and not (
+                info["added_objectids"] or info["removed_objectids"]
+            ):
+                lines.append("- objectid 不變，但圖徵屬性或幾何內容有更新")
         lines.append("")
 
     if unchanged_layers:

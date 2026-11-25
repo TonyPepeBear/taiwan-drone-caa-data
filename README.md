@@ -61,7 +61,7 @@ gunzip uav_restricted_airspace.geojson.gz
 
 ### 使用 manifest.json
 
-每個 release 都附帶 `manifest.json`，記錄所有圖層的同步時間、筆數、objectid 清單：
+每個 release 都附帶 `manifest.json`，記錄所有圖層的同步時間、筆數、objectid 清單與圖徵內容指紋（features_sha256）：
 
 ```json
 {
@@ -76,8 +76,8 @@ gunzip uav_restricted_airspace.geojson.gz
 ## Release 說明
 
 - **Tag 格式**：`vYYYY.MM.DD-HHMM`（UTC+8 時間）
-- **自動偵測變動**：比對前後兩版的 objectid 集合，只有實際資料有變動才會建立新 release
-- **Release body**：列出每個圖層的筆數變化、新增 / 移除的 objectid
+- **自動偵測變動**：比對前後兩版的 objectid 集合與圖徵內容（含屬性和幾何）；前版未記錄內容指紋時會發布一次以建立基準
+- **Release body**：列出每個圖層的筆數變化、新增 / 移除的 objectid，以及 ID 不變的內容更新
 - **保留策略**：所有 release 全部保留，可回溯任意時間點的資料快照
 
 ## 自動同步
